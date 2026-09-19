@@ -8,7 +8,7 @@ import MemoryGraphModal from "./components/MemoryGraphModal";
 import LifeEventsModal from "./components/LifeEventsModal";
 import { getActionDeadlineCategory, getEffectiveActionItems } from "./utils/datetime";
 
-const API = "http://127.0.0.1:8000";
+const API =  "https://memora-w72x.onrender.com";
 
 const CATEGORIES = [
   "study",
