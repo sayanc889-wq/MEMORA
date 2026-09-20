@@ -63,7 +63,7 @@ def _add_missing_document_columns() -> None:
 
 
 def init_db() -> None:
-    from app.models import Document, Memory, LifeEvent, DocumentRelation  # noqa: F401
+    from app.models import Document, Memory, LifeEvent, DocumentRelation, WebResource  # noqa: F401
 
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.uploads_dir.mkdir(parents=True, exist_ok=True)

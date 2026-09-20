@@ -8,6 +8,7 @@ from app.api.routes.documents import router as documents_router
 from app.api.routes.health import router as health_router
 from app.api.routes.life_events import router as life_events_router
 from app.api.routes.memories import router as memories_router
+from app.api.routes.web_resources import router as web_resources_router
 from app.core.config import settings
 from app.core.database import init_db
 
@@ -33,3 +34,4 @@ app.include_router(memories_router)
 app.include_router(documents_router)
 app.include_router(assistant_router)
 app.include_router(life_events_router)
+app.include_router(web_resources_router)

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MEMORA</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-group">
+        <img src="icons/icon32.png" alt="Memora" class="logo-icon">
+        <div>
+          <h1 class="logo-title">MEMORA</h1>
+          <span class="logo-tagline">Study & Resource Vault</span>
+        </div>
+      </div>
+      <div class="header-status" id="backendStatus" title="Backend Status">
+        <span class="status-dot online"></span>
+        <span class="status-text">Local</span>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="saveTab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+        Save
+      </button>
+      <button class="nav-tab" data-tab="searchTab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        Search
+      </button>
+      <button class="nav-tab" data-tab="assistantTab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2z"></path><path d="m9 12 2 2 4-4"></path></svg>
+        Ask AI
+      </button>
+      <button class="nav-tab" data-tab="settingsTab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Sync
+      </button>
+    </nav>
+
+    <!-- Tab 1: Save Resource -->
+    <main id="saveTab" class="tab-content active">
+      <div class="current-page-banner" id="pageBanner">
+        <div class="source-badge" id="sourceBadge">Web</div>
+        <div class="page-title-preview" id="previewTitle">Loading current page...</div>
+      </div>
+
+      <!-- YouTube Timestamp Box (if YouTube) -->
+      <div class="youtube-box" id="youtubeBox" style="display: none;">
+        <div class="yt-header">
+          <span class="yt-icon">▶</span>
+          <span class="yt-label">YouTube Video Detected</span>
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" id="includeTimestamp" checked>
+          <span>Save at current video timestamp (<strong id="timestampText">00:00</strong>)</span>
+        </label>
+      </div>
+
+      <form id="saveForm" class="resource-form">
+        <div class="form-group">
+          <label for="resTitle">Title</label>
+          <input type="text" id="resTitle" required placeholder="Resource or lecture title">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="resCategory">Category</label>
+            <select id="resCategory">
+              <option value="study" selected>🎓 Study / College</option>
+              <option value="project">🚀 Project</option>
+              <option value="work">💼 Work / Job</option>
+              <option value="finance">💰 Finance</option>
+              <option value="health">🩺 Health</option>
+              <option value="personal">👤 Personal</option>
+              <option value="general">📁 General</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="resTags">Tags / Topic</label>
+            <input type="text" id="resTags" placeholder="e.g. #compiler, #dsa">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="resNotes">Study Notes / Takeaways</label>
+          <textarea id="resNotes" rows="2" placeholder="Key ideas, formulas, or highlighted excerpt..."></textarea>
+        </div>
+
+        <!-- Reminder Section -->
+        <div class="reminder-section">
+          <div class="reminder-header">
+            <span>⏰ Remind Me to Review</span>
+            <button type="button" class="btn-clear-reminder" id="clearReminderBtn">Clear</button>
+          </div>
+          <div class="preset-chips">
+            <button type="button" class="chip" data-hours="2">In 2h</button>
+            <button type="button" class="chip" data-hours="8">Tonight</button>
+            <button type="button" class="chip" data-days="1">Tomorrow</button>
+            <button type="button" class="chip" data-days="3">This Weekend</button>
+          </div>
+          <input type="datetime-local" id="remindAt" class="date-picker">
+          <input type="text" id="resAction" placeholder="Review task (e.g. Solve 3 parser questions)" class="action-input">
+        </div>
+
+        <button type="submit" class="btn-primary" id="saveBtn">
+          <span class="btn-text">Save to Memora</span>
+          <span class="btn-spinner" style="display: none;">Saving...</span>
+        </button>
+      </form>
+    </main>
+
+    <!-- Tab 2: Search & Library -->
+    <section id="searchTab" class="tab-content">
+      <div class="search-bar-wrapper">
+        <div class="search-input-box">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="searchInput" placeholder="Search (e.g. compiler design notes)..." autocomplete="off">
+          <button type="button" id="clearSearchBtn" class="clear-search" style="display: none;">✕</button>
+        </div>
+      </div>
+
+      <div class="search-meta">
+        <label class="toggle-switch">
+          <input type="checkbox" id="semanticToggle" checked>
+          <span class="slider"></span>
+          <span class="toggle-label">Semantic AI Search</span>
+        </label>
+        <span id="resultsCount" class="results-count">0 items</span>
+      </div>
+
+      <div class="filter-chips" id="searchFilters">
+        <button class="filter-chip active" data-filter="all">All</button>
+        <button class="filter-chip" data-filter="study">Study</button>
+        <button class="filter-chip" data-filter="youtube">YouTube</button>
+        <button class="filter-chip" data-filter="reminders">Reminders</button>
+      </div>
+
+      <div class="results-list" id="resultsList">
+        <div class="empty-state">
+          <p>No resources found yet. Save a YouTube video or article to start!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Ask AI -->
+    <section id="assistantTab" class="tab-content">
+      <div class="assistant-chat-container">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-bubble ai">
+            👋 Hi! I'm your Memora Assistant. Ask me to find study resources, review notes, or check upcoming reminders!
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <input type="text" id="assistantInput" placeholder="e.g. Find compiler design notes...">
+          <button type="button" id="assistantSendBtn" class="btn-send">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: Settings & Sync -->
+    <section id="settingsTab" class="tab-content">
+      <div class="settings-card">
+        <h3>Memora Backend Connection</h3>
+        <p class="settings-desc">Choose whether to connect to your local Memora backend or remote cloud service.</p>
+        
+        <div class="form-group">
+          <label for="serverUrlInput">Backend URL</label>
+          <input type="text" id="serverUrlInput" value="http://127.0.0.1:8000">
+        </div>
+
+        <div class="preset-urls">
+          <button type="button" class="btn-url-preset" data-url="http://127.0.0.1:8000">Local (127.0.0.1:8000)</button>
+          <button type="button" class="btn-url-preset" data-url="https://memora-w72x.onrender.com">Cloud Render</button>
+        </div>
+
+        <div class="sync-actions">
+          <button type="button" class="btn-secondary" id="syncNowBtn">
+            ⚡ Sync Local Storage with DB
+          </button>
+          <button type="button" class="btn-secondary" id="openDashboardBtn">
+            🚀 Open Web Dashboard
+          </button>
+        </div>
+
+        <div class="sync-status" id="syncStatus"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
