@@ -40,28 +40,6 @@ MEMORA is an intelligent full-stack second-brain and document management applica
 - *Data & Processing:* RESTful APIs, Semantic Search pipeline
 - *Hosting:* Render
 
----
-
-## 📁 Repository Structure
-
-MEMORA/
-├── backend/
-│   ├── app/
-│   │   ├── api/routes/       # API endpoints (documents, web resources)
-│   │   ├── core/             # Database and core config
-│   │   ├── models/           # Data models
-│   │   ├── schemas/          # Pydantic schemas
-│   │   ├── services/         # Semantic search and business logic
-│   │   └── main.py           # FastAPI entrypoint & CORS setup
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── components/       # UI Components (Dashboard, ResourcesHub, Modals)
-│   │   ├── App.jsx           # Main application setup
-│   │   └── main.jsx
-│   └── package.json
-└── extension/                # Browser extension source files
-
 
 💻 Local Development Setup
 
@@ -90,10 +68,12 @@ npm install
 # Start Vite development server
 npm run dev
 
+
 Frontend will run at http://localhost:5173.
 ⚙️ Environment Variables
 Frontend (frontend/.env)
 VITE_API_URL=[https://memora-w72x.onrender.com](https://memora-w72x.onrender.com)
+
 
 (Set to http://127.0.0.1:8000 for local development).
 👥 Contributors
