@@ -9,8 +9,7 @@ import LifeEventsModal from "./components/LifeEventsModal";
 import ResourcesHub from "./components/ResourcesHub";
 import { getActionDeadlineCategory, getEffectiveActionItems } from "./utils/datetime";
 
-const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-
+const API = import.meta.env.VITE_API_URL || "https://memora-w72x.onrender.com";
 const CATEGORIES = [
   "study",
   "personal",
