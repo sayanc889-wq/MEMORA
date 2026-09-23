@@ -8,6 +8,8 @@ export default function ResourcesHub({ apiBase }) {
   const [activeFilter, setActiveFilter] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showExtensionGuide, setShowExtensionGuide] = useState(false);
+  const [expandedTodos, setExpandedTodos] = useState({});
+  const [generatingCardId, setGeneratingCardId] = useState(null);
   const [newResource, setNewResource] = useState({
     title: "",
     url: "",
@@ -95,6 +97,15 @@ export default function ResourcesHub({ apiBase }) {
       list = list.filter((r) => r.category === "study");
     } else if (activeFilter === "youtube") {
       list = list.filter((r) => r.source_type === "youtube");
+    } else if (activeFilter === "todos") {
+      list = list.filter((r) => {
+        try {
+          const t = typeof r.todos_json === "string" ? JSON.parse(r.todos_json) : r.todos_json;
+          return Array.isArray(t) && t.length > 0;
+        } catch {
+          return false;
+        }
+      });
     } else if (activeFilter === "reminders") {
       list = list.filter((r) => r.remind_at);
     }
@@ -146,6 +157,72 @@ export default function ResourcesHub({ apiBase }) {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleToggleTodo = async (resourceId, todoId) => {
+    const target = resources.find((r) => r.id === resourceId);
+    if (!target) return;
+
+    let todos = [];
+    try {
+      todos = typeof target.todos_json === "string" ? JSON.parse(target.todos_json) : target.todos_json;
+    } catch (e) {}
+
+    const updatedTodos = todos.map((t) => (t.id === todoId ? { ...t, completed: !t.completed } : t));
+    const updatedJson = JSON.stringify(updatedTodos);
+
+    setResources((prev) =>
+      prev.map((r) => (r.id === resourceId ? { ...r, todos_json: updatedJson } : r))
+    );
+
+    try {
+      await fetch(`${apiBase}/web-resources/${resourceId}/todos`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ todos: updatedTodos }),
+      });
+    } catch (e) {
+      console.error("Failed to sync todo change:", e);
+    }
+  };
+
+  const handleGenerateTodosForCard = async (resItem) => {
+    try {
+      setGeneratingCardId(resItem.id);
+      const genRes = await fetch(`${apiBase}/web-resources/generate-todos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: resItem.title,
+          url: resItem.url,
+          notes: resItem.notes,
+          tags: resItem.tags,
+          category: resItem.category,
+        }),
+      });
+
+      if (genRes.ok) {
+        const plan = await genRes.json();
+        const todos = plan.todos || [];
+        const todosJson = JSON.stringify(todos);
+
+        await fetch(`${apiBase}/web-resources/${resItem.id}/todos`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ todos }),
+        });
+
+        setResources((prev) =>
+          prev.map((r) => (r.id === resItem.id ? { ...r, todos_json: todosJson } : r))
+        );
+        setExpandedTodos((prev) => ({ ...prev, [resItem.id]: true }));
+        showToast("✨ AI Study Todos generated!");
+      }
+    } catch (err) {
+      showToast("Could not generate todos: " + err.message);
+    } finally {
+      setGeneratingCardId(null);
     }
   };
 
@@ -275,6 +352,7 @@ export default function ResourcesHub({ apiBase }) {
             { id: "all", label: `All (${resources.length})` },
             { id: "study", label: "🎓 College & Study" },
             { id: "youtube", label: "▶️ YouTube Lectures" },
+            { id: "todos", label: "🎯 Study Todos" },
             { id: "reminders", label: "⏰ Has Reminder" },
           ].map((tab) => (
             <button
@@ -425,6 +503,149 @@ export default function ResourcesHub({ apiBase }) {
                       🎯 {res.matchReason}
                     </div>
                   )}
+
+                  {/* Study Milestones & Todos */}
+                  {(() => {
+                    let todos = [];
+                    try {
+                      if (res.todos_json) {
+                        todos = typeof res.todos_json === "string" ? JSON.parse(res.todos_json) : res.todos_json;
+                      }
+                    } catch (e) {}
+
+                    const hasTodos = Array.isArray(todos) && todos.length > 0;
+                    const isExpanded = !!expandedTodos[res.id];
+                    const doneCount = hasTodos ? todos.filter((t) => t.completed).length : 0;
+                    const percent = hasTodos ? Math.round((doneCount / todos.length) * 100) : 0;
+
+                    return (
+                      <div style={{ marginTop: "10px", marginBottom: "8px" }}>
+                        {hasTodos ? (
+                          <div
+                            style={{
+                              background: "rgba(0, 0, 0, 0.25)",
+                              border: "1px solid rgba(139, 92, 246, 0.2)",
+                              borderRadius: "8px",
+                              padding: "8px 10px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                marginBottom: "5px",
+                              }}
+                            >
+                              <span style={{ fontSize: "11px", fontWeight: 700, color: "#c084fc" }}>
+                                🎯 Milestones ({doneCount}/{todos.length})
+                              </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 800,
+                                    color: percent === 100 ? "#10b981" : "#38bdf8",
+                                  }}
+                                >
+                                  {percent}%
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedTodos((prev) => ({ ...prev, [res.id]: !prev[res.id] }))
+                                  }
+                                  style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    color: "#94a3b8",
+                                    fontSize: "11px",
+                                    cursor: "pointer",
+                                    padding: "0 2px",
+                                  }}
+                                  title={isExpanded ? "Collapse todos" : "Expand todos"}
+                                >
+                                  {isExpanded ? "▲" : "▼"}
+                                </button>
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                width: "100%",
+                                height: "4px",
+                                background: "rgba(255, 255, 255, 0.08)",
+                                borderRadius: "2px",
+                                overflow: "hidden",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: `${percent}%`,
+                                  height: "100%",
+                                  background:
+                                    percent === 100
+                                      ? "#10b981"
+                                      : "linear-gradient(90deg, #8b5cf6, #38bdf8)",
+                                  transition: "width 0.3s ease",
+                                }}
+                              />
+                            </div>
+
+                            {isExpanded && (
+                              <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "5px" }}>
+                                {todos.map((todo) => (
+                                  <label
+                                    key={todo.id}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "flex-start",
+                                      gap: "6px",
+                                      cursor: "pointer",
+                                      fontSize: "12px",
+                                      color: todo.completed ? "#64748b" : "#cbd5e1",
+                                      textDecoration: todo.completed ? "line-through" : "none",
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={!!todo.completed}
+                                      onChange={() => handleToggleTodo(res.id, todo.id)}
+                                      style={{ marginTop: "2px", accentColor: "#8b5cf6" }}
+                                    />
+                                    <span>{todo.text}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateTodosForCard(res)}
+                            disabled={generatingCardId === res.id}
+                            style={{
+                              background: "rgba(139, 92, 246, 0.1)",
+                              border: "1px solid rgba(139, 92, 246, 0.3)",
+                              borderRadius: "6px",
+                              color: "#c084fc",
+                              padding: "4px 8px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "5px",
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            <span>✨</span>
+                            <span>{generatingCardId === res.id ? "Generating..." : "Generate AI Todos"}</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div

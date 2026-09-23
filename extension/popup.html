@@ -92,6 +92,45 @@
           <textarea id="resNotes" rows="2" placeholder="Key ideas, formulas, or highlighted excerpt..."></textarea>
         </div>
 
+        <!-- AI Study Todos & Milestones Section -->
+        <div class="todos-section" id="todosSection">
+          <div class="todos-header">
+            <div class="todos-title-wrap">
+              <span class="todos-icon">🎯</span>
+              <span class="todos-heading">Study Milestones &amp; Todos</span>
+            </div>
+            <button type="button" class="btn-ai-generate" id="generateTodosBtn">
+              <span class="ai-sparkle">✨</span>
+              <span class="ai-btn-text">Generate AI Todos</span>
+              <span class="ai-btn-spinner" style="display: none;">Generating...</span>
+            </button>
+          </div>
+          <p class="todos-subtitle" id="todosSubtitle">
+            Let the LLM create actionable study milestones for you, or customize your own!
+          </p>
+
+          <!-- Milestone Progress Bar -->
+          <div class="milestone-progress-container" id="milestoneProgressContainer" style="display: none;">
+            <div class="milestone-meta">
+              <span class="milestone-name" id="milestoneName">Milestone Progress</span>
+              <span class="progress-percent" id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+            </div>
+            <div class="progress-count-text" id="progressCountText">0 of 0 completed</div>
+          </div>
+
+          <!-- Todos Checklist Container -->
+          <div class="todos-list" id="todosList"></div>
+
+          <!-- Quick Add Custom Todo Row -->
+          <div class="add-todo-row" id="addTodoRow" style="display: none;">
+            <input type="text" id="newTodoInput" placeholder="+ Add a study milestone or todo...">
+            <button type="button" id="addTodoBtn" class="btn-add-todo">Add</button>
+          </div>
+        </div>
+
         <!-- Reminder Section -->
         <div class="reminder-section">
           <div class="reminder-header">
@@ -138,6 +177,7 @@
         <button class="filter-chip active" data-filter="all">All</button>
         <button class="filter-chip" data-filter="study">Study</button>
         <button class="filter-chip" data-filter="youtube">YouTube</button>
+        <button class="filter-chip" data-filter="todos">🎯 Todos</button>
         <button class="filter-chip" data-filter="reminders">Reminders</button>
       </div>
 

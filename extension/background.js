@@ -127,7 +127,8 @@ async function saveResourceLocallyAndSync(resource) {
         remind_at: resource.remind_at,
         action: resource.action,
         action_status: resource.action_status || "No Action",
-        metadata_json: resource.metadata_json
+        metadata_json: resource.metadata_json,
+        todos_json: resource.todos_json || null
       })
     });
     if (res.ok) {

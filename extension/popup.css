@@ -768,3 +768,306 @@ textarea {
   color: var(--accent-green);
   text-align: center;
 }
+
+/* ========================================================
+   AI Study Todos & Milestones Section
+   ======================================================== */
+.todos-section {
+  background: rgba(139, 92, 246, 0.05);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.todos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.todos-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.todos-icon {
+  font-size: 14px;
+}
+
+.todos-heading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.2px;
+}
+
+.btn-ai-generate {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.8) 0%, rgba(56, 189, 248, 0.8) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.6);
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 5px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-ai-generate:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.5);
+  border-color: #38bdf8;
+}
+
+.btn-ai-generate:active {
+  transform: translateY(0);
+}
+
+.ai-sparkle {
+  font-size: 11px;
+}
+
+.todos-subtitle {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+/* Milestone Progress Bar */
+.milestone-progress-container {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+
+.milestone-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.milestone-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-purple-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.progress-percent {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent-cyan);
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6 0%, #38bdf8 100%);
+  border-radius: 4px;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-bar-fill.completed-all {
+  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+}
+
+.progress-count-text {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* Todos Checklist */
+.todos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 190px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.todo-item:hover {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.todo-checkbox {
+  margin-top: 2px;
+  accent-color: var(--accent-purple);
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.todo-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.todo-text {
+  font-size: 11px;
+  color: var(--text-primary);
+  line-height: 1.35;
+  transition: all 0.15s ease;
+}
+
+.todo-item.completed .todo-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.todo-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+  opacity: 0.85;
+}
+
+.btn-remove-todo {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+
+.btn-remove-todo:hover {
+  opacity: 1;
+  color: var(--accent-red);
+}
+
+/* Add custom todo row */
+.add-todo-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.add-todo-row input[type="text"] {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 10.5px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.add-todo-row input[type="text"]:focus {
+  border-color: var(--accent-purple);
+}
+
+.btn-add-todo {
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  color: var(--accent-purple-light);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-add-todo:hover {
+  background: var(--accent-purple);
+  color: #ffffff;
+}
+
+/* Card Todos Badge & Drawer in Library */
+.card-todos-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.card-todos-pill.all-done {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-green);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.btn-card-todos-toggle {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: var(--accent-purple-light);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+}
+
+.btn-card-todos-toggle:hover {
+  background: rgba(139, 92, 246, 0.3);
+  color: #ffffff;
+}
+
+.card-todos-drawer {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
