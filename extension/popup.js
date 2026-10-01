@@ -5,10 +5,14 @@ let currentTabInfo = null;
 let activeFilter = "all";
 let backendUrl = DEFAULT_BACKEND;
 
+let currentTodos = [];
+let currentMilestoneTitle = "";
+
 document.addEventListener("DOMContentLoaded", async () => {
   await loadSettings();
   initTabs();
   initPresets();
+  initTodos();
   await checkBackendHealth();
   await loadCurrentPageInfo();
   initSearch();
@@ -173,6 +177,198 @@ function initPresets() {
   saveForm.addEventListener("submit", handleSaveResource);
 }
 
+// AI Study Todos Management
+function initTodos() {
+  const generateBtn = document.getElementById("generateTodosBtn");
+  const addBtn = document.getElementById("addTodoBtn");
+  const newTodoInput = document.getElementById("newTodoInput");
+
+  if (generateBtn) {
+    generateBtn.addEventListener("click", handleGenerateAITodos);
+  }
+
+  if (addBtn && newTodoInput) {
+    addBtn.addEventListener("click", handleAddCustomTodo);
+    newTodoInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleAddCustomTodo();
+      }
+    });
+  }
+}
+
+async function handleGenerateAITodos() {
+  const generateBtn = document.getElementById("generateTodosBtn");
+  const btnText = generateBtn.querySelector(".ai-btn-text");
+  const btnSpinner = generateBtn.querySelector(".ai-btn-spinner");
+
+  btnText.style.display = "none";
+  btnSpinner.style.display = "inline";
+  generateBtn.disabled = true;
+
+  const title = document.getElementById("resTitle").value.trim() || (currentTabInfo ? currentTabInfo.title : "Study Topic");
+  const category = document.getElementById("resCategory").value;
+  const tags = document.getElementById("resTags").value.trim();
+  const notes = document.getElementById("resNotes").value.trim();
+  const url = currentTabInfo ? currentTabInfo.url : "";
+
+  try {
+    const res = await fetch(`${backendUrl}/web-resources/generate-todos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, url, notes, tags, category }),
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      currentTodos = data.todos || [];
+      currentMilestoneTitle = data.milestone_title || "Study Milestone";
+    } else {
+      throw new Error("Backend response error");
+    }
+  } catch (err) {
+    // Client-side fallback if backend is offline or slow
+    const fallback = generateClientSideTodos(title, url, tags);
+    currentTodos = fallback.todos;
+    currentMilestoneTitle = fallback.milestone_title;
+  } finally {
+    btnSpinner.style.display = "none";
+    btnText.style.display = "inline";
+    generateBtn.disabled = false;
+  }
+
+  renderTodosList();
+}
+
+function generateClientSideTodos(title, url, tags) {
+  const t = `${title || ""} ${tags || ""} ${url || ""}`.toLowerCase();
+  let topic = "Study Topic";
+  let milestone_title = "Study Milestone";
+  let todos = [];
+
+  if (t.includes("oops") || t.includes("oop") || t.includes("object oriented") || t.includes("class") || t.includes("inheritance") || t.includes("polymorphism") || t.includes("encapsulation")) {
+    topic = "Object-Oriented Programming (OOPS)";
+    milestone_title = "OOPS Mastery & Playlist Milestone";
+    todos = [
+      { id: "todo_1", text: "Understand Classes, Objects & state encapsulation", completed: false, category: "Core Concept" },
+      { id: "todo_2", text: "Implement Encapsulation with access modifiers and getters/setters", completed: false, category: "Pillar 1" },
+      { id: "todo_3", text: "Build Inheritance hierarchy and override base methods", completed: false, category: "Pillar 2" },
+      { id: "todo_4", text: "Master Polymorphism (Compile-time overloading vs Runtime dynamic dispatch)", completed: false, category: "Pillar 3" },
+      { id: "todo_5", text: "Design an Abstract Class / Interface contract", completed: false, category: "Pillar 4" },
+      { id: "todo_6", text: "Solve 2 OOP design practice problems (e.g. Parking Lot or Bank Account)", completed: false, category: "Practice" },
+      { id: "todo_7", text: "Summarize lecture notes and record milestone completion", completed: false, category: "Milestone" }
+    ];
+  } else if (t.includes("dsa") || t.includes("algorithm") || t.includes("data structure") || t.includes("tree") || t.includes("graph") || t.includes("dp")) {
+    topic = "Data Structures & Algorithms";
+    milestone_title = "DSA Problem Solving Milestone";
+    todos = [
+      { id: "todo_1", text: "Analyze Time & Space Complexity (Big-O analysis)", completed: false, category: "Complexity" },
+      { id: "todo_2", text: "Trace algorithm step-by-step with pen and paper", completed: false, category: "Tracing" },
+      { id: "todo_3", text: "Implement algorithm from scratch without built-in helpers", completed: false, category: "Coding" },
+      { id: "todo_4", text: "Solve 2 related practice problems covering edge cases", completed: false, category: "Practice" },
+      { id: "todo_5", text: "Log key pattern and template in study vault", completed: false, category: "Review" }
+    ];
+  } else {
+    topic = title ? title.slice(0, 40) : "Study Topic";
+    milestone_title = `Milestone: ${topic}`;
+    todos = [
+      { id: "todo_1", text: `Watch video & note key principles for "${topic}"`, completed: false, category: "Concept" },
+      { id: "todo_2", text: "Write hands-on code or worked example from lecture", completed: false, category: "Hands-on" },
+      { id: "todo_3", text: "Solve 2 practice exercises or self-test questions", completed: false, category: "Practice" },
+      { id: "todo_4", text: "Summarize 3 flashcard takeaways for revision", completed: false, category: "Review" },
+      { id: "todo_5", text: "Mark milestone completed in playlist tracker", completed: false, category: "Milestone" }
+    ];
+  }
+
+  return { topic, milestone_title, todos };
+}
+
+function renderTodosList() {
+  const container = document.getElementById("milestoneProgressContainer");
+  const listEl = document.getElementById("todosList");
+  const addRow = document.getElementById("addTodoRow");
+  const milestoneNameEl = document.getElementById("milestoneName");
+  const progressPercentEl = document.getElementById("progressPercent");
+  const progressBarFillEl = document.getElementById("progressBarFill");
+  const progressCountTextEl = document.getElementById("progressCountText");
+
+  if (!currentTodos || currentTodos.length === 0) {
+    if (container) container.style.display = "none";
+    if (addRow) addRow.style.display = "none";
+    if (listEl) listEl.innerHTML = "";
+    return;
+  }
+
+  if (container) container.style.display = "block";
+  if (addRow) addRow.style.display = "flex";
+
+  const total = currentTodos.length;
+  const completedCount = currentTodos.filter(t => t.completed).length;
+  const percent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+
+  if (milestoneNameEl) milestoneNameEl.textContent = currentMilestoneTitle || "Study Milestone";
+  if (progressPercentEl) progressPercentEl.textContent = `${percent}%`;
+  if (progressBarFillEl) {
+    progressBarFillEl.style.width = `${percent}%`;
+    progressBarFillEl.className = percent === 100 ? "progress-bar-fill completed-all" : "progress-bar-fill";
+  }
+  if (progressCountTextEl) {
+    progressCountTextEl.textContent = `${completedCount} of ${total} completed`;
+  }
+
+  listEl.innerHTML = currentTodos.map(todo => `
+    <div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
+      <input type="checkbox" class="todo-checkbox" ${todo.completed ? 'checked' : ''}>
+      <div class="todo-content">
+        <span class="todo-text">${escapeHtml(todo.text)}</span>
+        ${todo.category ? `<span class="todo-tag">${escapeHtml(todo.category)}</span>` : ''}
+      </div>
+      <button type="button" class="btn-remove-todo" title="Remove todo">✕</button>
+    </div>
+  `).join("");
+
+  listEl.querySelectorAll(".todo-item").forEach(itemEl => {
+    const todoId = itemEl.dataset.id;
+    const checkbox = itemEl.querySelector(".todo-checkbox");
+    const content = itemEl.querySelector(".todo-content");
+    const removeBtn = itemEl.querySelector(".btn-remove-todo");
+
+    const toggle = () => {
+      const target = currentTodos.find(t => t.id === todoId);
+      if (target) {
+        target.completed = !target.completed;
+        renderTodosList();
+      }
+    };
+
+    checkbox.addEventListener("change", toggle);
+    content.addEventListener("click", toggle);
+    removeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      currentTodos = currentTodos.filter(t => t.id !== todoId);
+      renderTodosList();
+    });
+  });
+}
+
+function handleAddCustomTodo() {
+  const input = document.getElementById("newTodoInput");
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  currentTodos.push({
+    id: "todo_" + Date.now(),
+    text,
+    completed: false,
+    category: "Custom"
+  });
+  input.value = "";
+  renderTodosList();
+}
+
 // Handle Save Resource
 async function handleSaveResource(e) {
   e.preventDefault();
@@ -210,8 +406,9 @@ async function handleSaveResource(e) {
     action_status: action ? "Pending" : "No Action",
     remind_at: remindAtVal ? new Date(remindAtVal).toISOString() : null,
     metadata_json: currentTabInfo && currentTabInfo.youtubeTimestamp !== null
-      ? JSON.stringify({ youtube_timestamp: currentTabInfo.youtubeTimestamp, channel: currentTabInfo.channelName })
+      ? JSON.stringify({ youtube_timestamp: currentTabInfo.youtubeTimestamp, channel: currentTabInfo.channelName, playlist_id: currentTabInfo.playlistId, playlist_index: currentTabInfo.playlistIndex })
       : null,
+    todos_json: currentTodos.length > 0 ? JSON.stringify(currentTodos) : null,
     created_at: new Date().toISOString()
   };
 
@@ -244,7 +441,8 @@ async function handleSaveResource(e) {
         remind_at: resource.remind_at,
         action: resource.action,
         action_status: resource.action_status,
-        metadata_json: resource.metadata_json
+        metadata_json: resource.metadata_json,
+        todos_json: resource.todos_json
       })
     });
     if (res.ok) {
@@ -255,6 +453,10 @@ async function handleSaveResource(e) {
   } catch (err) {
     console.log("Saved offline, will sync when backend is available.");
   }
+
+  // Clear current todos state after save
+  currentTodos = [];
+  renderTodosList();
 
   // 4. Send toast to tab
   try {
@@ -386,6 +588,15 @@ async function renderLibrary(query = "") {
     items = items.filter(r => r.category === "study");
   } else if (activeFilter === "youtube") {
     items = items.filter(r => r.source_type === "youtube");
+  } else if (activeFilter === "todos") {
+    items = items.filter(r => {
+      try {
+        const t = typeof r.todos_json === "string" ? JSON.parse(r.todos_json) : r.todos_json;
+        return Array.isArray(t) && t.length > 0;
+      } catch (e) {
+        return false;
+      }
+    });
   } else if (activeFilter === "reminders") {
     items = items.filter(r => r.remind_at);
   }
@@ -432,6 +643,74 @@ async function renderLibrary(query = "") {
       btn.textContent = "✓";
       setTimeout(() => btn.textContent = "📋", 1200);
     });
+
+    // Toggle card todos drawer
+    const toggleTodosBtn = card.querySelector(".btn-card-todos-toggle");
+    if (toggleTodosBtn) {
+      toggleTodosBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const drawer = card.querySelector(`#cardTodosDrawer_${id}`);
+        if (drawer) {
+          drawer.style.display = drawer.style.display === "none" ? "flex" : "none";
+        }
+      });
+    }
+
+    // Toggle individual todo checkbox on card
+    card.querySelectorAll(".card-todo-check").forEach(checkbox => {
+      checkbox.addEventListener("change", async (e) => {
+        e.stopPropagation();
+        const todoId = checkbox.dataset.todoId;
+        const resId = checkbox.dataset.resId;
+
+        const data = await chrome.storage.local.get(["resources"]);
+        let resources = data.resources || [];
+        const targetRes = resources.find(r => String(r.id) === String(resId));
+
+        if (targetRes && targetRes.todos_json) {
+          let todos = [];
+          try {
+            todos = typeof targetRes.todos_json === "string" ? JSON.parse(targetRes.todos_json) : targetRes.todos_json;
+          } catch (err) {}
+
+          const targetTodo = todos.find(t => t.id === todoId);
+          if (targetTodo) {
+            targetTodo.completed = checkbox.checked;
+            targetRes.todos_json = JSON.stringify(todos);
+            await chrome.storage.local.set({ resources });
+
+            // Sync with backend if serverId or numeric id
+            const serverId = targetRes.serverId || (Number.isInteger(Number(resId)) ? resId : null);
+            if (serverId) {
+              try {
+                await fetch(`${backendUrl}/web-resources/${serverId}/todos`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ todos })
+                });
+              } catch (err) {}
+            }
+
+            // Update parent label styling
+            const label = checkbox.closest(".todo-item");
+            if (label) {
+              if (checkbox.checked) label.classList.add("completed");
+              else label.classList.remove("completed");
+            }
+
+            // Update card pill
+            const doneCount = todos.filter(t => t.completed).length;
+            const percent = Math.round((doneCount / todos.length) * 100);
+            const pill = card.querySelector(".card-todos-pill");
+            if (pill) {
+              pill.textContent = `🎯 ${doneCount}/${todos.length} (${percent}%)`;
+              if (doneCount === todos.length) pill.classList.add("all-done");
+              else pill.classList.remove("all-done");
+            }
+          }
+        }
+      });
+    });
   });
 }
 
@@ -451,17 +730,55 @@ function createResourceCardHTML(item) {
     matchReasonHTML = `<span class="match-reason-pill">🎯 ${item.matchReason}</span>`;
   }
 
+  let todos = [];
+  try {
+    if (item.todos_json) {
+      todos = typeof item.todos_json === "string" ? JSON.parse(item.todos_json) : item.todos_json;
+    }
+  } catch (e) {}
+
+  let todosPillHTML = "";
+  let todosDrawerHTML = "";
+  if (Array.isArray(todos) && todos.length > 0) {
+    const doneCount = todos.filter(t => t.completed).length;
+    const isAllDone = doneCount === todos.length;
+    const percent = Math.round((doneCount / todos.length) * 100);
+    todosPillHTML = `
+      <span class="card-todos-pill ${isAllDone ? 'all-done' : ''}" title="${doneCount} of ${todos.length} study todos completed">
+        🎯 ${doneCount}/${todos.length} (${percent}%)
+      </span>
+      <button type="button" class="btn-card-todos-toggle" data-id="${item.id}" title="Toggle study todos checklist">
+        📋 Todos ${isAllDone ? '✓' : ''}
+      </button>
+    `;
+    todosDrawerHTML = `
+      <div class="card-todos-drawer" id="cardTodosDrawer_${item.id}" style="display: none;">
+        ${todos.map(t => `
+          <label class="todo-item ${t.completed ? 'completed' : ''}" style="margin: 0;">
+            <input type="checkbox" class="card-todo-check" data-res-id="${item.id}" data-todo-id="${t.id}" ${t.completed ? 'checked' : ''}>
+            <span class="todo-content">
+              <span class="todo-text">${escapeHtml(t.text)}</span>
+              ${t.category ? `<span class="todo-tag">${escapeHtml(t.category)}</span>` : ''}
+            </span>
+          </label>
+        `).join("")}
+      </div>
+    `;
+  }
+
   return `
     <div class="resource-card" data-url="${escapeHtml(item.url)}" data-id="${item.id}">
       <div class="card-header">
         <span class="${badgeClass}">${badgeText}</span>
         <div class="card-actions">
+          ${todosPillHTML}
           <button type="button" class="btn-icon btn-copy" title="Copy URL">📋</button>
           <button type="button" class="btn-icon btn-delete" title="Delete">🗑️</button>
         </div>
       </div>
       <div class="card-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
       ${item.notes ? `<div class="card-notes">${escapeHtml(item.notes)}</div>` : ""}
+      ${todosDrawerHTML}
       <div class="card-footer">
         <div class="card-tags">
           <span class="category-pill">${escapeHtml(item.category || "study")}</span>

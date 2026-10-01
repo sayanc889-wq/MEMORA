@@ -62,6 +62,21 @@ def _add_missing_document_columns() -> None:
         )
 
 
+def _add_missing_web_resource_columns() -> None:
+    inspector = inspect(engine)
+    if "web_resources" not in inspector.get_table_names():
+        return
+
+    existing = {column["name"] for column in inspector.get_columns("web_resources")}
+    new_columns = {
+        "todos_json": "ALTER TABLE web_resources ADD COLUMN todos_json TEXT",
+    }
+    with engine.begin() as connection:
+        for name, statement in new_columns.items():
+            if name not in existing:
+                connection.execute(text(statement))
+
+
 def init_db() -> None:
     from app.models import Document, Memory, LifeEvent, DocumentRelation, WebResource  # noqa: F401
 
@@ -71,3 +86,4 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _add_missing_memory_columns()
     _add_missing_document_columns()
+    _add_missing_web_resource_columns()

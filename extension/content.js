@@ -51,6 +51,40 @@ function extractPageMetadata() {
 
     // Clean up YouTube title
     title = title.replace(/\s*-\s*YouTube$/, "");
+
+    // Playlist detection
+    let playlistId = "";
+    let playlistIndex = null;
+    let playlistTitle = "";
+    try {
+      const parsedUrl = new URL(url);
+      playlistId = parsedUrl.searchParams.get("list") || "";
+      const idx = parsedUrl.searchParams.get("index");
+      if (idx) playlistIndex = parseInt(idx, 10);
+
+      const playlistHeader = document.querySelector("#header-description h3") ||
+                             document.querySelector("ytd-playlist-panel-renderer #header-title");
+      if (playlistHeader) {
+        playlistTitle = playlistHeader.textContent.trim();
+      }
+    } catch (e) {}
+
+    return {
+      title,
+      url,
+      timestampUrl,
+      selectedText,
+      metaDescription,
+      isYouTube,
+      youtubeTimestamp,
+      channelName,
+      playlistId,
+      playlistIndex,
+      playlistTitle,
+      isGitHub,
+      repoName,
+      favicon: getFavicon()
+    };
   }
 
   // GitHub detection
@@ -69,9 +103,12 @@ function extractPageMetadata() {
     timestampUrl,
     selectedText,
     metaDescription,
-    isYouTube,
-    youtubeTimestamp,
-    channelName,
+    isYouTube: false,
+    youtubeTimestamp: null,
+    channelName: "",
+    playlistId: "",
+    playlistIndex: null,
+    playlistTitle: "",
     isGitHub,
     repoName,
     favicon: getFavicon()

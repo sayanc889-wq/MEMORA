@@ -20,7 +20,6 @@
     }
   },
   "background": {
-    "scripts": ["background.js"],
     "service_worker": "background.js"
   },
   "content_scripts": [
@@ -37,21 +36,10 @@
     "notifications",
     "contextMenus"
   ],
-  "sidebar_action": {
-    "default_panel": "sidepanel.html",
-    "default_title": "Memora Study Vault",
-    "default_icon": "icons/icon32.png"
-  },
   "host_permissions": [
     "http://127.0.0.1:8000/*",
     "http://localhost:8000/*",
     "https://memora-w72x.onrender.com/*",
     "<all_urls>"
-  ],
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "memora-assistant@memora.local",
-      "strict_min_version": "109.0"
-    }
-  }
+  ]
 }
