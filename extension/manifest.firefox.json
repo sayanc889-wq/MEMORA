@@ -1,0 +1,56 @@
+{
+  "manifest_version": 3,
+  "name": "MEMORA - Life & Study Resource Assistant",
+  "version": "1.0.0",
+  "description": "Capture YouTube lectures with timestamps, college study resources, articles, and notes with reminder timers and single semantic search.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Memora Quick Capture & Search",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "alarms",
+    "notifications",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*",
+    "https://memora-w72x.onrender.com/*",
+    "<all_urls>"
+  ],
+  "sidebar_action": {
+    "default_panel": "sidepanel.html",
+    "default_title": "Memora Study Vault",
+    "default_icon": "icons/icon32.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "memora-assistant@memora.local",
+      "strict_min_version": "109.0"
+    }
+  }
+}

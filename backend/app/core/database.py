@@ -117,9 +117,28 @@ def _ensure_default_seed() -> None:
             logger.warning("Could not associate orphaned rows: %s", e)
 
 
+def _add_missing_web_resource_columns() -> None:
+    inspector = inspect(engine)
+    if "web_resources" not in inspector.get_table_names():
+        return
+
+    existing = {column["name"] for column in inspector.get_columns("web_resources")}
+    new_columns = {
+        "todos_json": "ALTER TABLE web_resources ADD COLUMN todos_json TEXT",
+    }
+    with engine.begin() as connection:
+        for name, statement in new_columns.items():
+            if name not in existing:
+                connection.execute(text(statement))
+
+
 def init_db() -> None:
+<<<<<<< HEAD
     from app.models import Base  # noqa: F401
     import app.models  # noqa: F401
+=======
+    from app.models import Document, Memory, LifeEvent, DocumentRelation, WebResource  # noqa: F401
+>>>>>>> 2335c0f8512805af2f32ab67c525102b3d4979d6
 
     if db_url.startswith("sqlite"):
         settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -127,5 +146,11 @@ def init_db() -> None:
 
     # Automatically create all tables (users, documents, youtube_links, life_events, memories, document_relations)
     Base.metadata.create_all(bind=engine)
+<<<<<<< HEAD
     _migrate_columns()
     _ensure_default_seed()
+=======
+    _add_missing_memory_columns()
+    _add_missing_document_columns()
+    _add_missing_web_resource_columns()
+>>>>>>> 2335c0f8512805af2f32ab67c525102b3d4979d6

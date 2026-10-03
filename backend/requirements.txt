@@ -5,9 +5,13 @@ pydantic-settings
 python-dotenv
 pytest
 httpx
+<<<<<<< HEAD
 psycopg2-binary
 pyjwt
 bcrypt
 passlib
 python-multipart
 email-validator
+=======
+python-multipart
+>>>>>>> 2335c0f8512805af2f32ab67c525102b3d4979d6

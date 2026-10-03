@@ -6,6 +6,7 @@ import DocumentModal from "./components/DocumentModal";
 import AskMemoraModal from "./components/AskMemoraModal";
 import MemoryGraphModal from "./components/MemoryGraphModal";
 import LifeEventsModal from "./components/LifeEventsModal";
+<<<<<<< HEAD
 import YoutubeLinksModal from "./components/YoutubeLinksModal";
 import AuthModal from "./components/AuthModal";
 import { useAuth } from "./context/useAuth";
@@ -13,6 +14,12 @@ import { useTheme } from "./context/ThemeContext";
 import { getActionDeadlineCategory, getEffectiveActionItems } from "./utils/datetime";
 import { API_BASE_URL as API } from "./config/api";
 
+=======
+import ResourcesHub from "./components/ResourcesHub";
+import { getActionDeadlineCategory, getEffectiveActionItems } from "./utils/datetime";
+
+const API = import.meta.env.VITE_API_URL || "https://memora-w72x.onrender.com";
+>>>>>>> 2335c0f8512805af2f32ab67c525102b3d4979d6
 const CATEGORIES = [
   "study",
   "personal",
@@ -566,6 +573,18 @@ export default function App() {
               {documents.filter((d) => d.remind_at).length}
             </span>
           </button>
+
+          <button
+            type="button"
+            className={`nav-link-btn ${activePage === "resources" ? "active" : ""}`}
+            onClick={() => {
+              setActivePage("resources");
+              resetFilters();
+            }}
+          >
+            <span className="nav-link-icon">🌐</span>
+            <span>Study & Web Vault</span>
+          </button>
         </nav>
 
         <div className="nav-group-title">Intelligence & Media</div>
@@ -658,6 +677,7 @@ export default function App() {
               {activePage === "actions" && "What Do I Need To Do?"}
               {activePage === "important" && "Important Documents"}
               {activePage === "reminders" && "Scheduled Reminders"}
+              {activePage === "resources" && "Study & Web Vault"}
             </h1>
             <p>
               {activePage === "dashboard" && "Overview of memory, upcoming actions, and deadlines"}
@@ -665,6 +685,7 @@ export default function App() {
               {activePage === "actions" && "Actionable items and task lifecycle"}
               {activePage === "important" && "Priority documents marked for quick access"}
               {activePage === "reminders" && "Active reminder schedule and alerts"}
+              {activePage === "resources" && "YouTube lectures, college study notes, and research links captured via extension"}
             </p>
           </div>
 
@@ -742,8 +763,15 @@ export default function App() {
         )}
 
         {/* Page Content */}
+<<<<<<< HEAD
         <div className="app-content flex-1 flex flex-col justify-start w-full">
           {activePage === "dashboard" ? (
+=======
+        <div className="app-content">
+          {activePage === "resources" ? (
+            <ResourcesHub apiBase={API} />
+          ) : activePage === "dashboard" ? (
+>>>>>>> 2335c0f8512805af2f32ab67c525102b3d4979d6
             <Dashboard
               documents={documents}
               loading={loading}
