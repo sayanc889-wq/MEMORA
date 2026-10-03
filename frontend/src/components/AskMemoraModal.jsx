@@ -13,6 +13,7 @@ export default function AskMemoraModal({
   isOpen,
   onClose,
   onViewDoc,
+  authFetch,
   apiBase,
 }) {
   const [query, setQuery] = useState("");
@@ -24,6 +25,8 @@ export default function AskMemoraModal({
     },
   ]);
   const [loading, setLoading] = useState(false);
+
+  const doFetch = authFetch || fetch;
 
   if (!isOpen) return null;
 
@@ -37,7 +40,7 @@ export default function AskMemoraModal({
     setLoading(true);
 
     try {
-      const res = await fetch(`${apiBase}/assistant/ask`, {
+      const res = await doFetch(`${apiBase}/assistant/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q }),

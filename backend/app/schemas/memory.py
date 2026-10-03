@@ -85,6 +85,7 @@ class MemoryUpdate(BaseModel):
 
 class MemoryResponse(BaseModel):
     id: int
+    user_id: int | None = None
     content: str
     title: str | None
     category: str

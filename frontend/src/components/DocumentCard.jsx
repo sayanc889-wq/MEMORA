@@ -1,5 +1,10 @@
 import React from "react";
-import { formatDate, formatFileSize, getActionDeadlineCategory } from "../utils/datetime";
+import {
+  calculateRemainingDaysInfo,
+  formatDate,
+  formatFileSize,
+  getActionDeadlineCategory,
+} from "../utils/datetime";
 
 const categoryIcons = {
   study: "🎓",
@@ -21,6 +26,8 @@ export default function DocumentCard({
 }) {
   const icon = categoryIcons[doc.category] || "📄";
   const deadlineCat = getActionDeadlineCategory(doc);
+  const remainingInfo = calculateRemainingDaysInfo(doc.action_due_date || doc.expiry_date, doc.action_status);
+  const badgeLabel = remainingInfo ? remainingInfo.badgeText : deadlineCat;
 
   const isCompleted = (doc.action_status || "").toUpperCase() === "COMPLETED";
   const hasAction = Boolean(doc.action && doc.action.trim());
@@ -73,8 +80,10 @@ export default function DocumentCard({
           <div className={`action-box ${isCompleted ? "action-box-completed" : ""}`}>
             <div className="action-header">
               <span className="action-tag">ACTION REQUIRED</span>
-              <span className={`timing-badge timing-${deadlineCat.toLowerCase().replace(/\s+/g, "-")}`}>
-                {deadlineCat}
+              <span
+                className={`timing-badge timing-${deadlineCat.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                {badgeLabel}
               </span>
             </div>
             <p className="action-text">{displayAction}</p>

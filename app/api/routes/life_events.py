@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.models.document import Document
 from app.models.life_event import DocumentRelation, LifeEvent
+from app.models.user import User
 from app.schemas.life_event import (
     DocumentRelationCreate,
     DocumentRelationResponse,
@@ -16,14 +17,26 @@ router = APIRouter(tags=["life_events"])
 
 
 @router.get("/life-events", response_model=list[LifeEventResponse])
-def list_life_events(db: Session = Depends(get_db)):
-    stmt = select(LifeEvent).order_by(LifeEvent.target_date.asc().nulls_last(), LifeEvent.id.desc())
+def list_life_events(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    stmt = (
+        select(LifeEvent)
+        .where(LifeEvent.user_id == current_user.id)
+        .order_by(LifeEvent.target_date.asc().nulls_last(), LifeEvent.id.desc())
+    )
     return db.scalars(stmt).all()
 
 
 @router.post("/life-events", response_model=LifeEventResponse, status_code=status.HTTP_201_CREATED)
-def create_life_event(payload: LifeEventCreate, db: Session = Depends(get_db)):
+def create_life_event(
+    payload: LifeEventCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     event = LifeEvent(
+        user_id=current_user.id,
         title=payload.title,
         event_type=payload.event_type,
         description=payload.description,
@@ -36,23 +49,50 @@ def create_life_event(payload: LifeEventCreate, db: Session = Depends(get_db)):
     return event
 
 
-@router.delete("/life-events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_life_event(event_id: int, db: Session = Depends(get_db)):
+@router.patch("/life-events/{event_id}/status", response_model=LifeEventResponse)
+def update_life_event_status(
+    event_id: int,
+    status_str: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     event = db.get(LifeEvent, event_id)
-    if event is None:
+    if event is None or event.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Life event not found")
+    event.status = status_str
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+@router.delete("/life-events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_life_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    event = db.get(LifeEvent, event_id)
+    if event is None or event.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Life event not found")
     db.delete(event)
     db.commit()
 
 
 @router.post("/documents/relations", response_model=DocumentRelationResponse, status_code=status.HTTP_201_CREATED)
-def create_document_relation(payload: DocumentRelationCreate, db: Session = Depends(get_db)):
+def create_document_relation(
+    payload: DocumentRelationCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     source = db.get(Document, payload.source_doc_id)
     target = db.get(Document, payload.target_doc_id)
     if not source or not target:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source or target document not found")
+    if source.user_id != current_user.id or target.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to document relation")
 
     rel = DocumentRelation(
+        user_id=current_user.id,
         source_doc_id=payload.source_doc_id,
         target_doc_id=payload.target_doc_id,
         relation_type=payload.relation_type,
@@ -65,22 +105,27 @@ def create_document_relation(payload: DocumentRelationCreate, db: Session = Depe
 
 
 @router.get("/documents/{document_id}/relations", response_model=list[DocumentRelationResponse])
-def get_document_relations(document_id: int, db: Session = Depends(get_db)):
+def get_document_relations(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     stmt = select(DocumentRelation).where(
-        (DocumentRelation.source_doc_id == document_id) | (DocumentRelation.target_doc_id == document_id)
+        DocumentRelation.user_id == current_user.id,
+        (DocumentRelation.source_doc_id == document_id) | (DocumentRelation.target_doc_id == document_id),
     )
     return db.scalars(stmt).all()
 
 
 @router.get("/graph/data")
-def get_memory_graph_data(db: Session = Depends(get_db)):
-    """Provides nodes and links for the interactive visual Memory Graph (Feature 7).
-
-    Connects: Category/Entity -> Document -> Action -> Deadline -> Reminder.
-    """
-    documents = db.scalars(select(Document)).all()
-    events = db.scalars(select(LifeEvent)).all()
-    relations = db.scalars(select(DocumentRelation)).all()
+def get_memory_graph_data(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Provides nodes and links for the interactive visual Memory Graph, strictly isolated to the user."""
+    documents = db.scalars(select(Document).where(Document.user_id == current_user.id)).all()
+    events = db.scalars(select(LifeEvent).where(LifeEvent.user_id == current_user.id)).all()
+    relations = db.scalars(select(DocumentRelation).where(DocumentRelation.user_id == current_user.id)).all()
 
     nodes = []
     links = []

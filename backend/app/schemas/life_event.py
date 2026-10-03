@@ -37,6 +37,7 @@ class LifeEventResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    user_id: int | None = None
     title: str
     event_type: str
     description: str | None
@@ -56,6 +57,7 @@ class DocumentRelationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    user_id: int | None = None
     source_doc_id: int
     target_doc_id: int
     relation_type: str

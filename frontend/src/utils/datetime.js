@@ -105,6 +105,54 @@ export function getActionDeadlineCategory(doc) {
 }
 
 /**
+ * Calculates remaining days dynamically according to requirement:
+ * - If due_date - today > 0: "Due in X days" (or "Due in 1 day")
+ * - If due_date == today: "Due Today"
+ * - If due_date < today and status != 'Completed': "Overdue"
+ */
+export function calculateRemainingDaysInfo(dueDateInput, status = "Pending") {
+  if (!dueDateInput) return null;
+  const target = parseDateSafe(dueDateInput);
+  if (!target) return null;
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const targetStart = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
+
+  const diffMs = targetStart - todayStart;
+  const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+
+  const isCompleted = String(status || "").toUpperCase() === "COMPLETED";
+
+  if (diffDays > 0) {
+    return {
+      diffDays,
+      status: "upcoming",
+      badgeText: diffDays === 1 ? "Due in 1 day" : `Due in ${diffDays} days`,
+      badgeClass: "badge-due-future",
+      isOverdue: false,
+    };
+  } else if (diffDays === 0) {
+    return {
+      diffDays: 0,
+      status: "today",
+      badgeText: "Due Today",
+      badgeClass: "badge-due-today",
+      isOverdue: false,
+    };
+  } else {
+    const absDays = Math.abs(diffDays);
+    return {
+      diffDays,
+      status: isCompleted ? "completed" : "overdue",
+      badgeText: isCompleted ? "Completed" : absDays === 1 ? "Overdue" : `Overdue (${absDays} days)`,
+      badgeClass: isCompleted ? "badge-completed" : "badge-overdue",
+      isOverdue: !isCompleted,
+    };
+  }
+}
+
+/**
  * Returns unified action items across all documents.
  * 
  * Rules:

@@ -2,10 +2,11 @@
 
 Rule-based query understanding and conversational assistant for life admin questions.
 Does not require paid LLM APIs. Can be seamlessly upgraded with local Hugging Face / Ollama.
+All queries strictly isolated to the authenticated user.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
+from datetime import datetime, timedelta
+from typing import Any, Dict
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -13,14 +14,19 @@ from app.models.document import Document
 from app.schemas.document import DocumentResponse
 
 
-def ask_memora(query: str, db: Session) -> Dict[str, Any]:
-    """Processes user query and returns structured conversational answer."""
+def ask_memora(query: str, db: Session, user_id: int | None = None) -> Dict[str, Any]:
+    """Processes user query and returns structured conversational answer scoped to user."""
     q = query.strip().lower()
     now = datetime.now()
 
+    def user_filter(stmt):
+        if user_id is not None:
+            return stmt.where(Document.user_id == user_id)
+        return stmt
+
     # 1. Overdue tasks
     if any(k in q for k in ["overdue", "past due", "delayed", "missed deadline"]):
-        stmt = (
+        stmt = user_filter(
             select(Document)
             .where(func.upper(Document.action_status) != "COMPLETED")
             .where(
@@ -49,7 +55,7 @@ def ask_memora(query: str, db: Session) -> Dict[str, Any]:
     # 2. What do I need to do this week / upcoming
     if any(k in q for k in ["this week", "upcoming", "what do i need to do", "next few days", "to do"]):
         week_end = now + timedelta(days=7)
-        stmt = (
+        stmt = user_filter(
             select(Document)
             .where(Document.action_status.in_(["Pending", "In Progress"]))
             .where(
@@ -64,7 +70,7 @@ def ask_memora(query: str, db: Session) -> Dict[str, Any]:
         docs = db.scalars(stmt).all()
         if not docs:
             # Fallback to all pending actions if none specifically due this week
-            stmt_all = (
+            stmt_all = user_filter(
                 select(Document)
                 .where(Document.action_status.in_(["Pending", "In Progress"]))
                 .where(Document.action.is_not(None))
@@ -86,7 +92,7 @@ def ask_memora(query: str, db: Session) -> Dict[str, Any]:
     # 3. Documents expiring soon
     if any(k in q for k in ["expir", "renewal", "validity"]):
         month_end = now + timedelta(days=30)
-        stmt = (
+        stmt = user_filter(
             select(Document)
             .where(Document.expiry_date.is_not(None))
             .where(Document.expiry_date <= month_end)
@@ -100,8 +106,7 @@ def ask_memora(query: str, db: Session) -> Dict[str, Any]:
             ]
             reply = f"Found {len(docs)} document(s) expiring within 30 days:\n" + "\n".join(items)
         else:
-            # List all documents with any expiry date
-            stmt_any = (
+            stmt_any = user_filter(
                 select(Document)
                 .where(Document.expiry_date.is_not(None))
                 .order_by(Document.expiry_date.asc())
@@ -126,7 +131,7 @@ def ask_memora(query: str, db: Session) -> Dict[str, Any]:
 
     # 4. Important documents with reminders
     if "important" in q and any(k in q for k in ["reminder", "remind"]):
-        stmt = (
+        stmt = user_filter(
             select(Document)
             .where(Document.is_important.is_(True))
             .where(Document.remind_at.is_not(None))
@@ -150,7 +155,7 @@ def ask_memora(query: str, db: Session) -> Dict[str, Any]:
 
     # 5. Pending actions
     if any(k in q for k in ["pending action", "show my pending", "pending task"]):
-        stmt = (
+        stmt = user_filter(
             select(Document)
             .where(Document.action_status.in_(["Pending", "In Progress"]))
             .order_by(Document.is_important.desc(), Document.updated_at.desc())
@@ -189,7 +194,7 @@ def ask_memora(query: str, db: Session) -> Dict[str, Any]:
             break
 
     if found_cat:
-        stmt = select(Document).where(Document.category == found_cat).order_by(Document.created_at.desc())
+        stmt = user_filter(select(Document).where(Document.category == found_cat).order_by(Document.created_at.desc()))
         docs = db.scalars(stmt).all()
         if docs:
             items = [f"• {d.title} ({d.file_name})" for d in docs]
@@ -207,7 +212,7 @@ def ask_memora(query: str, db: Session) -> Dict[str, Any]:
     search_term = q.replace("show", "").replace("find", "").replace("search", "").replace("what", "").replace("which", "").strip()
     if search_term:
         pattern = f"%{search_term}%"
-        stmt = (
+        stmt = user_filter(
             select(Document)
             .where(
                 or_(
@@ -234,7 +239,7 @@ def ask_memora(query: str, db: Session) -> Dict[str, Any]:
         }
 
     # Fallback greeting / capabilities
-    stmt_total = select(Document)
+    stmt_total = user_filter(select(Document))
     all_docs = db.scalars(stmt_total).all()
     pending = sum(1 for d in all_docs if d.action_status == "Pending")
     reply = (

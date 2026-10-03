@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { formatDate } from "../utils/datetime";
+import { calculateRemainingDaysInfo, formatDate } from "../utils/datetime";
 
 const EVENT_TEMPLATES = [
   { type: "Exam", icon: "📝", title: "Semester Final Exam", defaultAction: "Verify admit card and exam schedule" },
@@ -15,6 +15,7 @@ export default function LifeEventsModal({
   isOpen,
   onClose,
   onOpenUploadWithTemplate,
+  authFetch,
   apiBase,
 }) {
   const [events, setEvents] = useState([]);
@@ -26,38 +27,29 @@ export default function LifeEventsModal({
     description: "",
   });
 
+  const doFetch = authFetch || fetch;
+
   useEffect(() => {
     if (!isOpen) return;
-    async function fetchEvents() {
-      try {
-        const res = await fetch(`${apiBase}/life-events`);
-        if (res.ok) {
-          const data = await res.json();
-          setEvents(data);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchEvents();
+    loadEvents();
   }, [isOpen, apiBase]);
 
   async function loadEvents() {
     try {
-      const res = await fetch(`${apiBase}/life-events`);
+      const res = await doFetch(`${apiBase}/life-events`);
       if (res.ok) {
         const data = await res.json();
         setEvents(data);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error loading life events:", err);
     }
   }
 
   async function handleCreateEvent(e) {
     e.preventDefault();
     try {
-      const res = await fetch(`${apiBase}/life-events`, {
+      const res = await doFetch(`${apiBase}/life-events`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -72,6 +64,32 @@ export default function LifeEventsModal({
         setNewEvent({ title: "", event_type: "Exam", target_date: "", description: "" });
         setShowAdd(false);
         await loadEvents();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleToggleStatus(ev) {
+    const nextStatus = ev.status === "Completed" ? "Active" : "Completed";
+    try {
+      const res = await doFetch(`${apiBase}/life-events/${ev.id}/status?status_str=${nextStatus}`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        setEvents((prev) => prev.map((e) => (e.id === ev.id ? { ...e, status: nextStatus } : e)));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleDeleteEvent(id) {
+    if (!window.confirm("Delete this life event?")) return;
+    try {
+      const res = await doFetch(`${apiBase}/life-events/${id}`, { method: "DELETE" });
+      if (res.ok || res.status === 204) {
+        setEvents((prev) => prev.filter((e) => e.id !== id));
       }
     } catch (err) {
       console.error(err);
@@ -189,17 +207,59 @@ export default function LifeEventsModal({
             </div>
           ) : (
             <div className="events-list">
-              {events.map((ev) => (
-                <div key={ev.id} className="event-row">
-                  <div className="event-type-badge">{ev.event_type}</div>
-                  <div className="event-info">
-                    <h4>{ev.title}</h4>
-                    {ev.description && <p>{ev.description}</p>}
-                    {ev.target_date && <small>Target: {formatDate(ev.target_date)}</small>}
+              {events.map((ev) => {
+                const dueInfo = calculateRemainingDaysInfo(ev.target_date, ev.status);
+                const isDone = ev.status === "Completed";
+
+                return (
+                  <div key={ev.id} className={`event-row ${isDone ? "event-row-done" : ""}`}>
+                    <div className="event-type-badge">{ev.event_type}</div>
+                    <div className="event-info">
+                      <h4>{ev.title}</h4>
+                      {ev.description && <p>{ev.description}</p>}
+                      <div className="event-timing-row">
+                        {ev.target_date && (
+                          <span className="target-date">
+                            📅 Target: {formatDate(ev.target_date)}
+                          </span>
+                        )}
+                        {dueInfo && (
+                          <span
+                            className={`timing-badge ${
+                              dueInfo.isOverdue
+                                ? "timing-overdue"
+                                : dueInfo.status === "today"
+                                ? "timing-due-today"
+                                : "timing-due-soon"
+                            }`}
+                          >
+                            {dueInfo.badgeText}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="event-row-actions">
+                      <button
+                        type="button"
+                        className={`btn-action-toggle ${isDone ? "btn-undo" : "btn-complete"}`}
+                        onClick={() => handleToggleStatus(ev)}
+                        title={isDone ? "Mark as Active" : "Mark as Completed"}
+                      >
+                        {isDone ? "↩ Active" : "✓ Done"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-card btn-card-danger"
+                        onClick={() => handleDeleteEvent(ev.id)}
+                        title="Delete event"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
-                  <span className="badge badge-status badge-progress">{ev.status}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

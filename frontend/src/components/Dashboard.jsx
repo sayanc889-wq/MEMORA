@@ -16,6 +16,7 @@ export default function Dashboard({
   onEdit,
   onDelete,
   onToggleStatus,
+  onSelectCategory,
   apiBase,
 }) {
   const [actionFilterTab, setActionFilterTab] = useState("All");
@@ -45,6 +46,47 @@ export default function Dashboard({
     const completed = actionItems.filter((item) => item.isCompleted).length;
 
     return { total, important, expiringSoon, pendingActions, overdue, completed };
+  }, [documents, actionItems]);
+
+  // Reactive Analytics Data: Progress & Category Breakdown (strictly user-isolated)
+  const analyticsData = useMemo(() => {
+    const totalDocs = documents.length;
+    const totalActions = actionItems.length;
+    const completed = actionItems.filter((i) => i.isCompleted).length;
+    const overdue = actionItems.filter((i) => !i.isCompleted && i.category === "Overdue").length;
+    const dueToday = actionItems.filter((i) => !i.isCompleted && i.category === "Due Today").length;
+    const pending = actionItems.filter(
+      (i) => !i.isCompleted && i.category !== "Overdue" && i.category !== "Due Today"
+    ).length;
+
+    const completionRate = totalActions > 0 ? Math.round((completed / totalActions) * 100) : 0;
+
+    const categoryConfig = [
+      { key: "study", label: "College / Study", color: "#6366f1", icon: "🎓" },
+      { key: "personal", label: "Personal", color: "#ec4899", icon: "👤" },
+      { key: "finance", label: "Finance", color: "#10b981", icon: "💳" },
+      { key: "health", label: "Medical / Health", color: "#ef4444", icon: "🩺" },
+      { key: "work", label: "Work / Job", color: "#3b82f6", icon: "💼" },
+      { key: "project", label: "Projects", color: "#8b5cf6", icon: "📁" },
+      { key: "general", label: "General", color: "#f59e0b", icon: "📄" },
+    ];
+
+    const categoryBreakdown = categoryConfig.map((cat) => {
+      const count = documents.filter((d) => d.category === cat.key).length;
+      const pct = totalDocs > 0 ? Math.round((count / totalDocs) * 100) : 0;
+      return { ...cat, count, pct };
+    });
+
+    return {
+      totalDocs,
+      totalActions,
+      completed,
+      overdue,
+      dueToday,
+      pending,
+      completionRate,
+      categoryBreakdown,
+    };
   }, [documents, actionItems]);
 
   // Next Best Action (Feature 8)
@@ -88,7 +130,7 @@ export default function Dashboard({
   }, [documents]);
 
   return (
-    <div className="dashboard-view">
+    <div className="dashboard-view flex flex-col justify-start w-full">
       {/* Top Metric Cards */}
       <div className="metrics-grid">
         <div className="metric-card" onClick={onOpenDocuments} style={{ cursor: "pointer" }} title="View All Documents">
@@ -159,6 +201,150 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+
+      {/* REACTIVE ANALYTICS SECTION: PROGRESS BARS & CATEGORY BREAKDOWN */}
+      <section className="section-container analytics-section">
+        <div className="section-header-flex">
+          <div>
+            <h2 className="section-title">📊 LIVE ANALYTICS & INSIGHTS</h2>
+            <p className="section-subtitle">Real-time status breakdown and category distribution of your data</p>
+          </div>
+        </div>
+
+        <div className="analytics-dual-grid">
+          {/* Card 1: Action Completion Progress (Pending vs Completed) */}
+          <div className="analytics-card">
+            <div className="analytics-card-header">
+              <div>
+                <span className="analytics-card-title">Action Completion Rate</span>
+                <span className="analytics-card-sub">
+                  {analyticsData.completed} of {analyticsData.totalActions} tasks completed
+                </span>
+              </div>
+              <span className="analytics-rate-badge">{analyticsData.completionRate}%</span>
+            </div>
+
+            {/* Segmented Progress Bar */}
+            <div className="progress-bar-container" title={`${analyticsData.completionRate}% Completed`}>
+              {analyticsData.totalActions === 0 ? (
+                <div className="progress-bar-empty">No tracked action tasks yet</div>
+              ) : (
+                <div className="progress-bar-track">
+                  <div
+                    className="progress-segment segment-completed"
+                    style={{
+                      width: `${(analyticsData.completed / analyticsData.totalActions) * 100}%`,
+                    }}
+                    title={`Completed: ${analyticsData.completed}`}
+                  />
+                  <div
+                    className="progress-segment segment-overdue"
+                    style={{
+                      width: `${(analyticsData.overdue / analyticsData.totalActions) * 100}%`,
+                    }}
+                    title={`Overdue: ${analyticsData.overdue}`}
+                  />
+                  <div
+                    className="progress-segment segment-today"
+                    style={{
+                      width: `${(analyticsData.dueToday / analyticsData.totalActions) * 100}%`,
+                    }}
+                    title={`Due Today: ${analyticsData.dueToday}`}
+                  />
+                  <div
+                    className="progress-segment segment-pending"
+                    style={{
+                      width: `${(analyticsData.pending / analyticsData.totalActions) * 100}%`,
+                    }}
+                    title={`Pending: ${analyticsData.pending}`}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Progress Legend with Counts */}
+            <div className="progress-legend">
+              <div
+                className="legend-item"
+                onClick={() => handleFilterTabChange("Completed")}
+                style={{ cursor: "pointer" }}
+              >
+                <span className="legend-dot dot-completed" />
+                <span className="legend-label">Completed</span>
+                <span className="legend-count">{analyticsData.completed}</span>
+              </div>
+              <div
+                className="legend-item"
+                onClick={() => handleFilterTabChange("Overdue")}
+                style={{ cursor: "pointer" }}
+              >
+                <span className="legend-dot dot-overdue" />
+                <span className="legend-label">Overdue</span>
+                <span className="legend-count">{analyticsData.overdue}</span>
+              </div>
+              <div
+                className="legend-item"
+                onClick={() => handleFilterTabChange("Due Today")}
+                style={{ cursor: "pointer" }}
+              >
+                <span className="legend-dot dot-today" />
+                <span className="legend-label">Due Today</span>
+                <span className="legend-count">{analyticsData.dueToday}</span>
+              </div>
+              <div
+                className="legend-item"
+                onClick={() => handleFilterTabChange("All")}
+                style={{ cursor: "pointer" }}
+              >
+                <span className="legend-dot dot-pending" />
+                <span className="legend-label">Pending</span>
+                <span className="legend-count">{analyticsData.pending}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Category Breakdown Distribution */}
+          <div className="analytics-card">
+            <div className="analytics-card-header">
+              <div>
+                <span className="analytics-card-title">Category Breakdown</span>
+                <span className="analytics-card-sub">Distribution of {analyticsData.totalDocs} documents</span>
+              </div>
+              <span className="analytics-count-badge">{analyticsData.totalDocs} Files</span>
+            </div>
+
+            <div className="category-bars-list">
+              {analyticsData.categoryBreakdown.map((cat) => (
+                <div
+                  key={cat.key}
+                  className="cat-bar-row"
+                  onClick={() => onSelectCategory && onSelectCategory(cat.key)}
+                  style={{ cursor: "pointer" }}
+                  title={`Filter by ${cat.label} (${cat.count} files)`}
+                >
+                  <div className="cat-bar-meta">
+                    <span className="cat-bar-label">
+                      {cat.icon} {cat.label}
+                    </span>
+                    <span className="cat-bar-count">
+                      {cat.count} ({cat.pct}%)
+                    </span>
+                  </div>
+                  <div className="cat-bar-track">
+                    <div
+                      className="cat-bar-fill"
+                      style={{
+                        width: `${Math.max(cat.pct, cat.count > 0 ? 5 : 0)}%`,
+                        backgroundColor: cat.color,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* FEATURE 8: WHAT SHOULD I DO NEXT? */}
       {nextAction && (

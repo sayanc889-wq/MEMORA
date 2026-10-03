@@ -26,6 +26,7 @@ export default function DocumentModal({
   onClose,
   onSubmit,
   editingDoc,
+  authFetch,
   apiBase,
 }) {
   const [form, setForm] = useState({
@@ -93,7 +94,8 @@ export default function DocumentModal({
     try {
       setSuggesting(true);
       setSuggestionNote("");
-      const res = await fetch(`${apiBase}/documents/suggest-action`, {
+      const doFetch = authFetch || fetch;
+      const res = await doFetch(`${apiBase}/documents/suggest-action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

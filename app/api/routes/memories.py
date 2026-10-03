@@ -4,16 +4,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_current_user, get_db
 from app.models.memory import Memory
+from app.models.user import User
 from app.schemas.memory import ALLOWED_CATEGORIES, MemoryCreate, MemoryResponse, MemoryUpdate
 
 router = APIRouter(tags=["memories"])
 
 
 @router.post("/memories", response_model=MemoryResponse, status_code=status.HTTP_201_CREATED)
-def create_memory(payload: MemoryCreate, db: Session = Depends(get_db)):
+def create_memory(
+    payload: MemoryCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     memory = Memory(
+        user_id=current_user.id,
         content=payload.content,
         title=payload.title,
         category=payload.category,
@@ -39,6 +45,7 @@ def list_memories(
     to_date: datetime | None = None,
     has_reminder: bool | None = None,
     remind_before: datetime | None = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     if category is not None and category not in ALLOWED_CATEGORIES:
@@ -47,7 +54,7 @@ def list_memories(
             detail=f"category must be one of: {', '.join(ALLOWED_CATEGORIES)}",
         )
 
-    statement = select(Memory)
+    statement = select(Memory).where(Memory.user_id == current_user.id)
     timeline = func.coalesce(Memory.occurred_at, Memory.created_at)
 
     if q is not None and q.strip():
@@ -98,17 +105,26 @@ def list_categories():
 
 
 @router.get("/memories/{memory_id}", response_model=MemoryResponse)
-def get_memory(memory_id: int, db: Session = Depends(get_db)):
+def get_memory(
+    memory_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     memory = db.get(Memory, memory_id)
-    if memory is None:
+    if memory is None or memory.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
     return memory
 
 
 @router.put("/memories/{memory_id}", response_model=MemoryResponse)
-def update_memory(memory_id: int, payload: MemoryUpdate, db: Session = Depends(get_db)):
+def update_memory(
+    memory_id: int,
+    payload: MemoryUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     memory = db.get(Memory, memory_id)
-    if memory is None:
+    if memory is None or memory.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
 
     updates = payload.model_dump(exclude_unset=True)
@@ -121,9 +137,13 @@ def update_memory(memory_id: int, payload: MemoryUpdate, db: Session = Depends(g
 
 
 @router.delete("/memories/{memory_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_memory(memory_id: int, db: Session = Depends(get_db)):
+def delete_memory(
+    memory_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     memory = db.get(Memory, memory_id)
-    if memory is None:
+    if memory is None or memory.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
 
     db.delete(memory)

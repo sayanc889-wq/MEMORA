@@ -144,6 +144,7 @@ class DocumentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    user_id: int | None = None
     title: str
     description: str | None
     category: str

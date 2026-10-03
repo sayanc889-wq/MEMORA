@@ -6,9 +6,12 @@ import DocumentModal from "./components/DocumentModal";
 import AskMemoraModal from "./components/AskMemoraModal";
 import MemoryGraphModal from "./components/MemoryGraphModal";
 import LifeEventsModal from "./components/LifeEventsModal";
+import YoutubeLinksModal from "./components/YoutubeLinksModal";
+import AuthModal from "./components/AuthModal";
+import { useAuth } from "./context/useAuth";
+import { useTheme } from "./context/ThemeContext";
 import { getActionDeadlineCategory, getEffectiveActionItems } from "./utils/datetime";
-
-const API = "http://127.0.0.1:8000";
+import { API_BASE_URL as API } from "./config/api";
 
 const CATEGORIES = [
   "study",
@@ -31,8 +34,11 @@ const categoryDisplayNames = {
 };
 
 export default function App() {
+  const { user, isAuthenticated, loading: authLoading, logout, authFetch, loginAsDemo } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+
   const [documents, setDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [activePage, setActivePage] = useState("dashboard");
 
@@ -45,48 +51,18 @@ export default function App() {
   const [reminderOnly, setReminderOnly] = useState(false);
   const [overdueOnly, setOverdueOnly] = useState(false);
 
-  // Theme Management with localStorage persistence & system preference detection
-  const [theme, setTheme] = useState(() => {
-    try {
-      const savedTheme = localStorage.getItem("memora-theme");
-      if (savedTheme === "dark" || savedTheme === "light") {
-        return savedTheme;
-      }
-    } catch {
-      // fallback
-    }
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches
-    ) {
-      return "dark";
-    }
-    return "light";
-  });
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.add("light");
-      document.documentElement.classList.remove("dark");
-    }
-    try {
-      localStorage.setItem("memora-theme", theme);
-    } catch (e) {
-      console.error(e);
-    }
-  }, [theme]);
-
-  function toggleTheme() {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
-  }
+  // Clean Logout & Session Switcher
+  const handleLogout = () => {
+    logout();
+    setDocuments([]);
+    setActivePage("dashboard");
+    setShowAuthModal(true);
+  };
 
   // Modals
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showYoutubeModal, setShowYoutubeModal] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [detailDoc, setDetailDoc] = useState(null);
   const [showAssistant, setShowAssistant] = useState(false);
@@ -94,7 +70,7 @@ export default function App() {
   const [showLifeEvents, setShowLifeEvents] = useState(false);
 
   // =========================================================
-  // NOTIFICATIONS (Preserved & Timezone-Correct)
+  // NOTIFICATIONS
   // =========================================================
 
   async function enableNotifications() {
@@ -149,74 +125,67 @@ export default function App() {
           requireInteraction: true,
           data: { documentId: doc.id },
         });
-      } else {
-        new Notification(title, { body });
       }
-    } catch (error) {
-      console.error("Reminder notification error:", error);
+    } catch (err) {
+      console.error(err);
     }
   }
 
-  function checkReminderNotifications(docs) {
+  function checkReminderNotifications(docList) {
     if (!("Notification" in window) || Notification.permission !== "granted") {
       return;
     }
 
     const now = Date.now();
-
-    docs.forEach((doc) => {
+    docList.forEach((doc) => {
       if (!doc.remind_at) return;
-
-      const reminderTime = new Date(doc.remind_at).getTime();
-      if (Number.isNaN(reminderTime)) return;
-
-      if (reminderTime <= now) {
-        const reminderKey = `memora-reminder-${doc.id}-${doc.remind_at}`;
-        if (sessionStorage.getItem(reminderKey) === "shown") {
-          return;
+      const remTime = new Date(doc.remind_at).getTime();
+      const diffMs = now - remTime;
+      // Alert if reminder fired within the last 60 seconds
+      if (diffMs >= 0 && diffMs <= 60000) {
+        const key = `memora-notified-${doc.id}-${doc.remind_at}`;
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, "true");
+          showReminderNotification(doc);
         }
-
-        sessionStorage.setItem(reminderKey, "shown");
-        showReminderNotification(doc);
       }
     });
   }
 
-  function scheduleReminderNotifications(docs) {
-    if (!("Notification" in window)) return;
-
-    docs.forEach((doc) => {
+  function scheduleReminderNotifications(docList) {
+    const now = Date.now();
+    docList.forEach((doc) => {
       if (!doc.remind_at) return;
-
-      const reminderTime = new Date(doc.remind_at).getTime();
-      if (Number.isNaN(reminderTime)) return;
-
-      const delay = reminderTime - Date.now();
-
-      if (delay <= 0) {
-        checkReminderNotifications([doc]);
-        return;
+      const remTime = new Date(doc.remind_at).getTime();
+      const delay = remTime - now;
+      if (delay > 0 && delay < 24 * 60 * 60 * 1000) {
+        window.setTimeout(() => {
+          checkReminderNotifications([doc]);
+        }, Math.min(delay, 2147483647));
       }
-
-      window.setTimeout(() => {
-        checkReminderNotifications([doc]);
-      }, Math.min(delay, 2147483647));
     });
   }
 
   // Periodic reminder checker every 10 seconds
   useEffect(() => {
+    if (!isAuthenticated) return;
     const interval = setInterval(() => {
       checkReminderNotifications(documents);
     }, 10000);
     return () => clearInterval(interval);
-  }, [documents]);
+  }, [documents, isAuthenticated]);
 
   // =========================================================
-  // LOAD DOCUMENTS
+  // LOAD DOCUMENTS (Strictly isolated by user token)
   // =========================================================
 
   async function loadDocuments() {
+    if (!isAuthenticated) {
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -230,9 +199,10 @@ export default function App() {
       if (overdueOnly) params.append("is_overdue", "true");
 
       const url = `${API}/documents${params.toString() ? `?${params.toString()}` : ""}`;
-      const response = await fetch(url);
+      const response = await authFetch(url);
 
       if (!response.ok) {
+        if (response.status === 401) return;
         throw new Error("Could not fetch documents");
       }
 
@@ -242,7 +212,7 @@ export default function App() {
       scheduleReminderNotifications(data);
     } catch (error) {
       console.error(error);
-      setMessage("Could not connect to FastAPI server. Please verify backend is running on port 8000.");
+      setMessage("Could not connect to backend server. Please verify the backend service is reachable.");
     } finally {
       setLoading(false);
     }
@@ -251,15 +221,16 @@ export default function App() {
   // Live filter reload
   useEffect(() => {
     loadDocuments();
-  }, [categoryFilter, importantOnly, expiryOnly, reminderOnly, actionStatusFilter, overdueOnly]);
+  }, [isAuthenticated, categoryFilter, importantOnly, expiryOnly, reminderOnly, actionStatusFilter, overdueOnly]);
 
   // Search debounce 350ms
   useEffect(() => {
+    if (!isAuthenticated) return;
     const timer = setTimeout(() => {
       loadDocuments();
     }, 350);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, isAuthenticated]);
 
   // =========================================================
   // DOCUMENT ACTIONS & OPERATIONS
@@ -282,7 +253,7 @@ export default function App() {
         is_important: formData.is_important,
       };
 
-      const res = await fetch(`${API}/documents/${isEditing.id}`, {
+      const res = await authFetch(`${API}/documents/${isEditing.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -313,7 +284,7 @@ export default function App() {
     if (formData.expiry_date) body.append("expiry_date", dateFormatted(formData.expiry_date));
     if (formData.remind_at) body.append("remind_at", dateFormatted(formData.remind_at));
 
-    const res = await fetch(`${API}/documents`, {
+    const res = await authFetch(`${API}/documents`, {
       method: "POST",
       body,
     });
@@ -323,7 +294,7 @@ export default function App() {
       throw new Error(err?.detail || "Upload failed");
     }
 
-    setMessage("Document uploaded and processed successfully.");
+    setMessage("Document uploaded and stored securely in Cloud Storage.");
     await loadDocuments();
   }
 
@@ -333,7 +304,7 @@ export default function App() {
       if (!doc.action || !doc.action.trim()) {
         payload.action = "Review expired document";
       }
-      const res = await fetch(`${API}/documents/${doc.id}/action-status`, {
+      const res = await authFetch(`${API}/documents/${doc.id}/action-status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -358,7 +329,7 @@ export default function App() {
     if (!confirmDel) return;
 
     try {
-      const res = await fetch(`${API}/documents/${id}`, { method: "DELETE" });
+      const res = await authFetch(`${API}/documents/${id}`, { method: "DELETE" });
       if (!res.ok && res.status !== 204) throw new Error("Delete failed");
       setMessage("Document deleted.");
       await loadDocuments();
@@ -368,9 +339,10 @@ export default function App() {
     }
   }
 
-  // =========================================================
-  // NAVIGATION HELPERS
-  // =========================================================
+  function handleOpenUploadWithTemplate(_template) {
+    setEditingDoc(null);
+    setShowUploadModal(true);
+  }
 
   function resetFilters() {
     setSearch("");
@@ -382,57 +354,148 @@ export default function App() {
     setOverdueOnly(false);
   }
 
-  function handleOpenUploadWithTemplate(template) {
-    setEditingDoc({
-      title: template.title,
-      action: template.action,
-      category: "general",
+  // Filtered documents list for Document Library view
+  const filteredDocuments = useMemo(() => {
+    return documents.filter((doc) => {
+      if (activePage === "important" && !doc.is_important) return false;
+      if (activePage === "reminders" && !doc.remind_at) return false;
+      if (activePage === "actions") {
+        const cat = getActionDeadlineCategory(doc);
+        const hasAction = Boolean(doc.action && doc.action.trim());
+        const isCompleted = (doc.action_status || "").toUpperCase() === "COMPLETED";
+        if (!hasAction && (!doc.expiry_date || cat !== "Overdue" || isCompleted)) return false;
+      }
+      return true;
     });
-    setShowUploadModal(true);
+  }, [documents, activePage]);
+
+  // Loading state during auth initialization
+  if (authLoading) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="auth-spinner" />
+        <p>Loading MEMORA workspace...</p>
+      </div>
+    );
   }
 
-  const effectiveActionItems = useMemo(() => getEffectiveActionItems(documents), [documents]);
-  const pendingActionsCount = useMemo(
-    () => effectiveActionItems.filter((i) => !i.isCompleted).length,
-    [effectiveActionItems]
-  );
+  // Unauthenticated Landing & Login View
+  if (!isAuthenticated) {
+    return (
+      <div className="landing-view">
+        <nav className="landing-nav">
+          <div className="brand-logo">
+            <span className="logo-icon">🧠</span>
+            <span className="logo-text">MEMORA</span>
+          </div>
+          <div className="landing-nav-actions">
+            <button type="button" className="btn-theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
+              {theme === "dark" ? "☀️" : "🌙"}
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => setShowAuthModal(true)}>
+              Sign In
+            </button>
+            <button type="button" className="btn-primary" onClick={() => setShowAuthModal(true)}>
+              Get Started →
+            </button>
+          </div>
+        </nav>
 
-  // Active view documents
-  const activeViewDocuments = useMemo(() => {
-    if (activePage === "important") {
-      return documents.filter((d) => d.is_important);
-    }
-    if (activePage === "reminders") {
-      return documents.filter((d) => d.remind_at);
-    }
-    if (activePage === "actions") {
-      if (actionStatusFilter === "Completed") {
-        const completedIds = new Set(effectiveActionItems.filter((i) => i.isCompleted).map((i) => i.doc.id));
-        return documents.filter((d) => completedIds.has(d.id));
-      }
-      if (actionStatusFilter === "Pending") {
-        const pendingIds = new Set(effectiveActionItems.filter((i) => !i.isCompleted).map((i) => i.doc.id));
-        return documents.filter((d) => pendingIds.has(d.id));
-      }
-      const actionDocIds = new Set(effectiveActionItems.map((i) => i.doc.id));
-      return documents.filter((d) => actionDocIds.has(d.id));
-    }
-    return documents;
-  }, [documents, activePage, actionStatusFilter, effectiveActionItems]);
+        <header className="landing-hero">
+          <div className="hero-pill">⚡ PRODUCTION-READY LIFE ADMIN ASSISTANT</div>
+          <h1 className="hero-title">
+            The Intelligent Second Brain for <span className="text-gradient">Your Documents & Life Admin</span>
+          </h1>
+          <p className="hero-description">
+            Never miss an insurance renewal, exam admit card, or tax deadline again. MEMORA provides
+            end-to-end user isolation, Cloud PostgreSQL persistence, automated deadline calculation,
+            and smart recommendations.
+          </p>
+
+          <div className="hero-cta-group">
+            <button
+              type="button"
+              className="btn-hero-primary"
+              onClick={async () => {
+                try {
+                  await loginAsDemo();
+                } catch {
+                  setShowAuthModal(true);
+                }
+              }}
+            >
+              🚀 Explore with Demo Account (Instant 1-Click)
+            </button>
+
+            <button
+              type="button"
+              className="btn-hero-secondary"
+              onClick={() => setShowAuthModal(true)}
+            >
+              Sign In or Register
+            </button>
+          </div>
+        </header>
+
+        <section className="landing-features-grid">
+          <div className="feature-card">
+            <div className="feature-icon">🔒</div>
+            <h3>Multi-Tenant Data Privacy</h3>
+            <p>Every uploaded document, life event, and video memory is isolated to your cryptographic user identity.</p>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon">☁️</div>
+            <h3>Permanent Cloud Storage</h3>
+            <p>Powered by Supabase Cloud PostgreSQL and resilient cloud storage bucket persistence.</p>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon">⚡</div>
+            <h3>Smart Action Suggestions</h3>
+            <p>Deterministic AI extracts due dates, renewal steps, and priority actions right as you upload.</p>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon">📊</div>
+            <h3>Real-Time Analytics & Sync</h3>
+            <p>Interactive progress meters and category breakdowns react immediately to live updates.</p>
+          </div>
+        </section>
+
+        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      </div>
+    );
+  }
+
+  // =========================================================
+  // AUTHENTICATED APPLICATION
+  // =========================================================
 
   return (
-    <div className="app-container">
+    <div className="app-layout flex flex-col md:flex-row min-h-screen w-full justify-start items-stretch">
       {/* Sidebar Navigation */}
       <aside className="app-sidebar">
-        <div className="brand-section">
-          <div className="brand-logo-badge">M</div>
-          <div>
-            <div className="brand-name">MEMORA</div>
-            <div className="brand-tagline">Life Memory Assistant</div>
+        <div className="sidebar-brand">
+          <div className="brand-logo">
+            <span className="logo-icon">🧠</span>
+            <span className="logo-text">MEMORA</span>
+          </div>
+          <span className="badge-pro">PRO</span>
+        </div>
+
+        {/* User Card in Sidebar */}
+        <div className="sidebar-user-pill">
+          <div className="user-avatar-circle">
+            {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
+          </div>
+          <div className="user-meta-truncate">
+            <span className="user-name-text">{user?.full_name || "My Workspace"}</span>
+            <span className="user-email-text">{user?.email}</span>
           </div>
         </div>
 
-        <div className="nav-group-title">Main Menu</div>
+        <div className="nav-group-title">Main Workspace</div>
         <nav className="nav-links-list">
           <button
             type="button"
@@ -455,7 +518,7 @@ export default function App() {
             }}
           >
             <span className="nav-link-icon">📁</span>
-            <span>All Documents</span>
+            <span>Documents Library</span>
             <span className="nav-link-count">{documents.length}</span>
           </button>
 
@@ -468,8 +531,10 @@ export default function App() {
             }}
           >
             <span className="nav-link-icon">⚡</span>
-            <span>Action Items</span>
-            <span className="nav-link-count">{pendingActionsCount}</span>
+            <span>Action Tasks</span>
+            <span className="nav-link-count">
+              {documents.filter((d) => d.action && d.action.trim()).length}
+            </span>
           </button>
 
           <button
@@ -477,7 +542,7 @@ export default function App() {
             className={`nav-link-btn ${activePage === "important" ? "active" : ""}`}
             onClick={() => {
               setActivePage("important");
-              setImportantOnly(true);
+              resetFilters();
             }}
           >
             <span className="nav-link-icon">⭐</span>
@@ -503,7 +568,7 @@ export default function App() {
           </button>
         </nav>
 
-        <div className="nav-group-title">Intelligence & Graph</div>
+        <div className="nav-group-title">Intelligence & Media</div>
         <nav className="nav-links-list">
           <button
             type="button"
@@ -517,19 +582,28 @@ export default function App() {
           <button
             type="button"
             className="nav-link-btn"
-            onClick={() => setShowGraph(true)}
+            onClick={() => setShowLifeEvents(true)}
           >
-            <span className="nav-link-icon">🕸️</span>
-            <span>Memory Graph</span>
+            <span className="nav-link-icon">🎯</span>
+            <span>Life Events</span>
           </button>
 
           <button
             type="button"
             className="nav-link-btn"
-            onClick={() => setShowLifeEvents(true)}
+            onClick={() => setShowYoutubeModal(true)}
           >
-            <span className="nav-link-icon">🎯</span>
-            <span>Smart Life Events</span>
+            <span className="nav-link-icon">📺</span>
+            <span>YouTube Knowledge</span>
+          </button>
+
+          <button
+            type="button"
+            className="nav-link-btn"
+            onClick={() => setShowGraph(true)}
+          >
+            <span className="nav-link-icon">🕸️</span>
+            <span>Memory Graph</span>
           </button>
         </nav>
 
@@ -555,16 +629,26 @@ export default function App() {
           <button
             type="button"
             className="btn-secondary btn-sm"
-            style={{ width: "100%", justifyContent: "center" }}
+            style={{ width: "100%", justifyContent: "center", marginBottom: 8 }}
             onClick={enableNotifications}
           >
-            🔔 Enable Notifications
+            🔔 Notifications
+          </button>
+
+          <button
+            type="button"
+            className="btn-logout-sidebar"
+            onClick={handleLogout}
+            title="Log out and switch account"
+            id="sidebar-logout-btn"
+          >
+            🚪 Sign Out
           </button>
         </div>
       </aside>
 
       {/* Main App Content Area */}
-      <main className="app-main">
+      <main className="app-main flex-1 flex flex-col min-h-screen justify-start w-full min-w-0">
         {/* Topbar */}
         <header className="app-topbar">
           <div className="page-heading">
@@ -625,6 +709,25 @@ export default function App() {
             >
               🤖 Ask MEMORA
             </button>
+
+            <div className="topbar-user-pill" title={`Signed in as ${user?.email || "User"}`}>
+              <div className="topbar-user-avatar">
+                {(user?.full_name || user?.email || "U").charAt(0).toUpperCase()}
+              </div>
+              <span className="topbar-user-label">
+                {user?.is_demo ? "Demo Account" : user?.full_name || user?.email || "User"}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="btn-logout-topbar"
+              onClick={handleLogout}
+              title="Sign out of this session and switch accounts"
+              id="topbar-logout-btn"
+            >
+              🚪 Sign Out
+            </button>
           </div>
         </header>
 
@@ -639,7 +742,7 @@ export default function App() {
         )}
 
         {/* Page Content */}
-        <div className="app-content">
+        <div className="app-content flex-1 flex flex-col justify-start w-full">
           {activePage === "dashboard" ? (
             <Dashboard
               documents={documents}
@@ -659,6 +762,10 @@ export default function App() {
               }}
               onDelete={handleDeleteDocument}
               onToggleStatus={handleToggleStatus}
+              onSelectCategory={(cat) => {
+                setCategoryFilter(cat);
+                setActivePage("documents");
+              }}
               apiBase={API}
             />
           ) : (
@@ -684,65 +791,85 @@ export default function App() {
                     value={actionStatusFilter}
                     onChange={(e) => setActionStatusFilter(e.target.value)}
                   >
-                    <option value="">All Action Statuses</option>
+                    <option value="">All Statuses</option>
+                    <option value="No Action">No Action</option>
                     <option value="Pending">Pending</option>
                     <option value="In Progress">In Progress</option>
                     <option value="Completed">Completed</option>
-                    <option value="No Action">No Action</option>
                   </select>
-
-                  <button
-                    type="button"
-                    className={`filter-toggle-btn ${importantOnly ? "active" : ""}`}
-                    onClick={() => setImportantOnly(!importantOnly)}
-                  >
-                    ⭐ Important
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`filter-toggle-btn ${overdueOnly ? "active" : ""}`}
-                    onClick={() => setOverdueOnly(!overdueOnly)}
-                  >
-                    🔴 Overdue
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`filter-toggle-btn ${expiryOnly ? "active" : ""}`}
-                    onClick={() => setExpiryOnly(!expiryOnly)}
-                  >
-                    ⏳ Has Expiry
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`filter-toggle-btn ${reminderOnly ? "active" : ""}`}
-                    onClick={() => setReminderOnly(!reminderOnly)}
-                  >
-                    ⏰ Has Reminder
-                  </button>
                 </div>
 
-                {(categoryFilter || actionStatusFilter || importantOnly || expiryOnly || reminderOnly || overdueOnly || search) && (
-                  <button type="button" className="btn-link" onClick={resetFilters}>
-                    Reset All Filters
+                <div className="filter-checkboxes">
+                  <label className="filter-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={importantOnly}
+                      onChange={(e) => setImportantOnly(e.target.checked)}
+                    />
+                    <span>⭐ Important</span>
+                  </label>
+
+                  <label className="filter-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={overdueOnly}
+                      onChange={(e) => setOverdueOnly(e.target.checked)}
+                    />
+                    <span>🔴 Overdue</span>
+                  </label>
+
+                  <label className="filter-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={expiryOnly}
+                      onChange={(e) => setExpiryOnly(e.target.checked)}
+                    />
+                    <span>⏳ Expiring</span>
+                  </label>
+
+                  <label className="filter-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={reminderOnly}
+                      onChange={(e) => setReminderOnly(e.target.checked)}
+                    />
+                    <span>⏰ Reminders</span>
+                  </label>
+                </div>
+
+                {(categoryFilter || actionStatusFilter || importantOnly || overdueOnly || expiryOnly || reminderOnly || search) && (
+                  <button type="button" className="btn-secondary btn-sm" onClick={resetFilters}>
+                    Clear Filters ✕
                   </button>
                 )}
               </div>
 
               {/* Documents Grid */}
               {loading ? (
-                <div className="empty-panel">Loading documents...</div>
-              ) : activeViewDocuments.length === 0 ? (
+                <div className="empty-panel">
+                  <div className="auth-spinner" />
+                  <p>Loading your documents...</p>
+                </div>
+              ) : filteredDocuments.length === 0 ? (
                 <div className="empty-panel">
                   <span className="empty-icon">📂</span>
                   <h3>No documents found</h3>
-                  <p>Try adjusting your search criteria or add a new document.</p>
+                  <p>Try clearing your filters or upload a new life admin document to get started.</p>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ marginTop: "1rem" }}
+                    onClick={() => {
+                      setEditingDoc(null);
+                      setShowUploadModal(true);
+                    }}
+                  >
+                    + Add First Document
+                  </button>
                 </div>
               ) : (
                 <div className="documents-grid">
-                  {activeViewDocuments.map((doc) => (
+                  {filteredDocuments.map((doc) => (
                     <DocumentCard
                       key={doc.id}
                       doc={doc}
@@ -772,6 +899,7 @@ export default function App() {
         }}
         onSubmit={handleSaveDocument}
         editingDoc={editingDoc}
+        authFetch={authFetch}
         apiBase={API}
       />
 
@@ -791,6 +919,7 @@ export default function App() {
         isOpen={showAssistant}
         onClose={() => setShowAssistant(false)}
         onViewDoc={(doc) => setDetailDoc(doc)}
+        authFetch={authFetch}
         apiBase={API}
       />
 
@@ -798,6 +927,7 @@ export default function App() {
         isOpen={showGraph}
         onClose={() => setShowGraph(false)}
         onViewDoc={(doc) => setDetailDoc(doc)}
+        authFetch={authFetch}
         apiBase={API}
       />
 
@@ -805,6 +935,14 @@ export default function App() {
         isOpen={showLifeEvents}
         onClose={() => setShowLifeEvents(false)}
         onOpenUploadWithTemplate={handleOpenUploadWithTemplate}
+        authFetch={authFetch}
+        apiBase={API}
+      />
+
+      <YoutubeLinksModal
+        isOpen={showYoutubeModal}
+        onClose={() => setShowYoutubeModal(false)}
+        authFetch={authFetch}
         apiBase={API}
       />
     </div>

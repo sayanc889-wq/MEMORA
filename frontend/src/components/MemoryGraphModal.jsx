@@ -4,11 +4,14 @@ export default function MemoryGraphModal({
   isOpen,
   onClose,
   onViewDoc,
+  authFetch,
   apiBase,
 }) {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const doFetch = authFetch || fetch;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -16,7 +19,7 @@ export default function MemoryGraphModal({
     async function loadGraph() {
       try {
         setLoading(true);
-        const res = await fetch(`${apiBase}/graph/data`);
+        const res = await doFetch(`${apiBase}/graph/data`);
         if (!res.ok) throw new Error("Could not load graph");
         const data = await res.json();
         if (mounted) {
