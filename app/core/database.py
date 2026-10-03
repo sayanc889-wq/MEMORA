@@ -133,24 +133,16 @@ def _add_missing_web_resource_columns() -> None:
 
 
 def init_db() -> None:
-<<<<<<< HEAD
     from app.models import Base  # noqa: F401
     import app.models  # noqa: F401
-=======
-    from app.models import Document, Memory, LifeEvent, DocumentRelation, WebResource  # noqa: F401
->>>>>>> 2335c0f8512805af2f32ab67c525102b3d4979d6
 
     if db_url.startswith("sqlite"):
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         settings.uploads_dir.mkdir(parents=True, exist_ok=True)
 
-    # Automatically create all tables (users, documents, youtube_links, life_events, memories, document_relations)
+    # Automatically create all tables (users, documents, youtube_links, life_events, memories, document_relations, web_resources)
     Base.metadata.create_all(bind=engine)
-<<<<<<< HEAD
     _migrate_columns()
-    _ensure_default_seed()
-=======
-    _add_missing_memory_columns()
-    _add_missing_document_columns()
     _add_missing_web_resource_columns()
->>>>>>> 2335c0f8512805af2f32ab67c525102b3d4979d6
+    _ensure_default_seed()
+
